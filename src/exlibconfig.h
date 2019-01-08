@@ -17,7 +17,7 @@
 #define CONFIG_HREF 23
 #define CONFIG_SDA 26
 #define CONFIG_SCL 27
-#define CONFIG_RESET 2
+#define CONFIG_RESET 32
 
 // from sdkconfig.defaults
 #define CONFIG_OV2640_SUPPORT 1
