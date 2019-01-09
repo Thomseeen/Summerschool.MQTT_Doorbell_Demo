@@ -221,6 +221,7 @@ static esp_err_t camera_fb_init(size_t count) {
             _fb2->buf = (uint8_t*)heap_caps_calloc(_fb2->size, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         } else {
             ESP_LOGI(TAG, "Allocating %d KB frame buffer in OnBoard RAM", s_state->fb_size / 1024);
+            ESP_LOGI(TAG, "%d B Heap remaining in OnBoard RAM", heap_caps_get_free_size(MALLOC_CAP_8BIT));
         }
         if (!_fb2->buf) {
             free(_fb2);

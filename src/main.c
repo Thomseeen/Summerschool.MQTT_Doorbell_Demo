@@ -43,6 +43,8 @@
 #define CAMERA_FRAME_SIZE CAMERA_FS_QVGA
 // TAG for the esp_log macros
 #define TAG "MQTT_Doorbell"
+// Expected max. size of frame
+#define MAXSIZE_OF_FRAME 20000  // bytes
 
 /*****************************************
  * Eventgroups
@@ -65,7 +67,14 @@ struct tm getLocalTime() {
     localtime_r(&now, &timeinfo);
     return timeinfo;
 }
-
+// Reconnect MQTT without init
+void mqtt_reconnect() {
+    // Wait for a Wifi-connection
+    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
+    esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+}
+// Reconnect MQTT with init (definition at init functions)
+void mqtt_init();
 /*****************************************
  * Task functions
  *****************************************/
@@ -110,7 +119,7 @@ void mqtt_publish_task(void* pvParameter) {
             }
             ESP_LOGI(TAG, "Doorbell ringing at %s, picture with %dbytes sent", timestr_buffer, fb->len);
             // Build buffer
-            uint8_t send_buffer[15366];
+            uint8_t send_buffer[MAXSIZE_OF_FRAME + 6];
             // - Time
             // The time_t datatype is a long -> 4 bytes that have to be sent
             send_buffer[0] = 'L';  // (Local) Used to easily identify the time message part in a hex-dump
@@ -118,9 +127,11 @@ void mqtt_publish_task(void* pvParameter) {
             send_buffer[2] = (uint8_t)(now >> 16) & 0xFF;
             send_buffer[3] = (uint8_t)(now >> 8) & 0xFF;
             send_buffer[4] = (uint8_t)now & 0xFF;
-            send_buffer[5] = 'D';  // (Data) Used to easily identify the picure message part in a hex-dump
+            send_buffer[5] = 'D';  // (Data) Used to easily identify the picture message part in a hex-dump
             // - Picture
             memcpy(send_buffer + 6, fb->buf, fb->len);
+            // Check RAM
+            ESP_LOGD(TAG, "%d B Heap remaining in OnBoard RAM", heap_caps_get_free_size(MALLOC_CAP_8BIT));
             // Publish
             esp_mqtt_publish(TOPIC_MQTT, send_buffer, fb->len + 6, 0, false);
             // Give back the buffer pointer
@@ -149,11 +160,13 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
+            xEventGroupClearBits(wifi_event_group, CONNECTING_BIT | CONNECTED_BIT);
             // WiFi disconnected
             esp_mqtt_stop();
             // Try to reastablish a Wifi-connection
             esp_wifi_connect();
-            xEventGroupClearBits(wifi_event_group, CONNECTING_BIT | CONNECTED_BIT);
+            // Try to reastablish connection to mqtt-broker
+            mqtt_reconnect();
             break;
         default:
             ESP_LOGW(TAG, "unknown WiFi-state");
@@ -177,7 +190,10 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             // Task to publish data on button-down should be created and started if this is a fresh startup
             // and should be resumed if it has already been created
             if (!mqtt_publish_task_handle) {
-                xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 20048, NULL, 10, &mqtt_publish_task_handle);
+                ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+                if (xTaskCreate(mqtt_publish_task, "mqtt_publish_task", MAXSIZE_OF_FRAME + 4096, NULL, 10, &mqtt_publish_task_handle) != pdPASS) {
+                    ESP_LOGE(TAG, "mqtt_publish_task could not be created");
+                }
             } else {
                 vTaskResume(mqtt_publish_task_handle);
             }
@@ -188,7 +204,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             // Task to publish data on button-down can be suspended as long as there is no connection to a broker
             vTaskSuspend(mqtt_publish_task_handle);
             // Try to reastablish a conenction to the MQTT-Broker
-            esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+            mqtt_init();
             break;
     }
 }
@@ -196,7 +212,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
  * Init / Start functions
  *****************************************/
 // Wifi
-void wifi_init(void) {
+void wifi_init() {
     ESP_LOGI(TAG, "Initializing Wifi");
     tcpip_adapter_init();
     wifi_event_group = xEventGroupCreate();
@@ -228,7 +244,7 @@ void sntp_start() {
     int retry = 0;
     const int retry_count = 10;
     // If the time has not been set yet the time will be 0 which is 1.1.1970 0:0:0.0
-    // tm_year of the tm struct is inyears since 1900
+    // tm_year of the tm struct is in years since 1900
     while ((timeinfo.tm_year <= (1970 - 1900)) && (++retry < retry_count)) {
         ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -237,7 +253,7 @@ void sntp_start() {
     }
 }
 // Camera
-void cam_init(void) {
+void cam_init() {
     ESP_LOGI(TAG, "Initializing camera");
     camera_config_t camera_config = {
         .ledc_channel = LEDC_CHANNEL_0,
@@ -259,8 +275,8 @@ void cam_init(void) {
         .pin_reset = CONFIG_RESET,
         .xclk_freq_hz = CONFIG_XCLK_FREQ,
         .pixel_format = PIXFORMAT_JPEG,
-        .frame_size = FRAMESIZE_QVGA,
-        .jpeg_quality = 12,
+        .frame_size = FRAMESIZE_VGA,  // FRAMESIZE_QVGA,
+        .jpeg_quality = 50,
         .fb_count = 1,
     };
     esp_err_t err = esp_camera_init(&camera_config);
@@ -269,11 +285,11 @@ void cam_init(void) {
         return;
     }
 }
-void mqtt_init(void) {
+void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, 17000, 5000);
+    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 5000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
@@ -284,6 +300,7 @@ void app_main() {
     esp_log_level_set("wifi", ESP_LOG_WARN);
     esp_log_level_set("system_api", ESP_LOG_WARN);
     esp_log_level_set("gpio", ESP_LOG_WARN);
+    esp_log_level_set(TAG, ESP_LOG_VERBOSE);
     // Initialize nvs flash
     ESP_ERROR_CHECK(nvs_flash_init());
     // WiFi init and status LED task start
@@ -297,7 +314,7 @@ void app_main() {
     struct tm localtime = getLocalTime();
     // Format the UNIX time into a human-readable string
     strftime(timestr_buffer, sizeof(timestr_buffer), "%c", &localtime);
-    ESP_LOGI(TAG, "The current date/time in Kalrsruhe is: %s", timestr_buffer);
+    ESP_LOGI(TAG, "The current date/time in Karlsruhe is: %s", timestr_buffer);
     // Camera init
     cam_init();
     // MQTT init
