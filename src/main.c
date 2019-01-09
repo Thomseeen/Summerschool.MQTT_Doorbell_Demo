@@ -44,7 +44,7 @@
 // TAG for the esp_log macros
 #define TAG "MQTT_Doorbell"
 // Expected max. size of frame
-#define MAXSIZE_OF_FRAME 20000  // bytes
+#define MAXSIZE_OF_FRAME 37000  // bytes
 
 /*****************************************
  * Eventgroups
@@ -118,22 +118,20 @@ void mqtt_publish_task(void* pvParameter) {
                 break;
             }
             ESP_LOGI(TAG, "Doorbell ringing at %s, picture with %dbytes sent", timestr_buffer, fb->len);
-            // Build buffer
-            uint8_t send_buffer[MAXSIZE_OF_FRAME + 6];
-            // - Time
+            // Build timestamp buffer
+            uint8_t send_buffer_time[5];
             // The time_t datatype is a long -> 4 bytes that have to be sent
-            send_buffer[0] = 'L';  // (Local) Used to easily identify the time message part in a hex-dump
-            send_buffer[1] = (uint8_t)(now >> 24) & 0xFF;
-            send_buffer[2] = (uint8_t)(now >> 16) & 0xFF;
-            send_buffer[3] = (uint8_t)(now >> 8) & 0xFF;
-            send_buffer[4] = (uint8_t)now & 0xFF;
-            send_buffer[5] = 'D';  // (Data) Used to easily identify the picture message part in a hex-dump
-            // - Picture
-            memcpy(send_buffer + 6, fb->buf, fb->len);
+            send_buffer_time[0] = 'T';  // (Local) Used to easily identify the time message part in a hex-dump
+            send_buffer_time[1] = (uint8_t)(now >> 24) & 0xFF;
+            send_buffer_time[2] = (uint8_t)(now >> 16) & 0xFF;
+            send_buffer_time[3] = (uint8_t)(now >> 8) & 0xFF;
+            send_buffer_time[4] = (uint8_t)now & 0xFF;
+            // Send time stamp
+            esp_mqtt_publish(TOPIC_MQTT, send_buffer_time, 5, 0, true);
             // Check RAM
             ESP_LOGD(TAG, "%d B Heap remaining in OnBoard RAM", heap_caps_get_free_size(MALLOC_CAP_8BIT));
-            // Publish
-            esp_mqtt_publish(TOPIC_MQTT, send_buffer, fb->len + 6, 0, false);
+            // Send picture
+            esp_mqtt_publish(TOPIC_MQTT, fb->buf, fb->len, 0, true);
             // Give back the buffer pointer
             esp_camera_fb_return(fb);
         }
@@ -190,8 +188,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             // Task to publish data on button-down should be created and started if this is a fresh startup
             // and should be resumed if it has already been created
             if (!mqtt_publish_task_handle) {
-                ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-                if (xTaskCreate(mqtt_publish_task, "mqtt_publish_task", MAXSIZE_OF_FRAME + 4096, NULL, 10, &mqtt_publish_task_handle) != pdPASS) {
+                if (xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 10, &mqtt_publish_task_handle) != pdPASS) {
                     ESP_LOGE(TAG, "mqtt_publish_task could not be created");
                 }
             } else {
@@ -276,7 +273,7 @@ void cam_init() {
         .xclk_freq_hz = CONFIG_XCLK_FREQ,
         .pixel_format = PIXFORMAT_JPEG,
         .frame_size = FRAMESIZE_VGA,  // FRAMESIZE_QVGA,
-        .jpeg_quality = 50,
+        .jpeg_quality = 20,
         .fb_count = 1,
     };
     esp_err_t err = esp_camera_init(&camera_config);
