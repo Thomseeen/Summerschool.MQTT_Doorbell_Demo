@@ -2,8 +2,8 @@
  * Communication relevant defines
  * ******************************/
 #define CONFIG_WIFI_SSID "MQTT-TestBroker"
-#define CONFIG_WIFI_PASSWORD "GetStarted"
-#define CONFIG_SERVER_IP "192.168.137.1"
+#define CONFIG_WIFI_PASSWORD "MQTT-TestBroker"
+#define CONFIG_SERVER_IP "192.168.178.2"
 #define CONFIG_MQTT_BROKER_IP CONFIG_SERVER_IP
 #define CONFIG_MQTT_USER NULL
 #define CONFIG_MQTT_PASS NULL

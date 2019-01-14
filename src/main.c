@@ -37,10 +37,8 @@
 #define PIN_PUSHBUTTON 33
 // MQTT Client-ID
 #define CLIENTID_MQTT "ESP32Doorbell01"
-#define TOPIC_MQTT "hska/office010/doorbell"
-// Camera formats
-#define CAMERA_PIXEL_FORMAT CAMERA_PF_GRAYSCALE
-#define CAMERA_FRAME_SIZE CAMERA_FS_QVGA
+#define TOPIC_MQTT_PIC "hska/office010/doorbell/picture"
+#define TOPIC_MQTT_TS "hska/office010/doorbell/timestamp"
 // TAG for the esp_log macros
 #define TAG "MQTT_Doorbell"
 // Expected max. size of frame
@@ -127,11 +125,11 @@ void mqtt_publish_task(void* pvParameter) {
             send_buffer_time[3] = (uint8_t)(now >> 8) & 0xFF;
             send_buffer_time[4] = (uint8_t)now & 0xFF;
             // Send time stamp
-            esp_mqtt_publish(TOPIC_MQTT, send_buffer_time, 5, 0, true);
+            esp_mqtt_publish(TOPIC_MQTT_TS, send_buffer_time, 5, 0, true);
             // Check RAM
             ESP_LOGD(TAG, "%d B Heap remaining in OnBoard RAM", heap_caps_get_free_size(MALLOC_CAP_8BIT));
             // Send picture
-            esp_mqtt_publish(TOPIC_MQTT, fb->buf, fb->len, 0, true);
+            esp_mqtt_publish(TOPIC_MQTT_PIC, fb->buf, fb->len, 0, true);
             // Give back the buffer pointer
             esp_camera_fb_return(fb);
         }
@@ -286,7 +284,7 @@ void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 5000);
+    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 15000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
