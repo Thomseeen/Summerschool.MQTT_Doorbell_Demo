@@ -1,5 +1,5 @@
 # Summerschool.MQTT_Doorbell_Demo
-An ESP32 ESP-IDF project in PlatfromIO using an OV2640 camera to send a picture via MQTT to a broker on a push-button signal: A Doorbell
+An ESP32 ESP-IDF project in PlatformIO using an OV2640 camera to send a picture via MQTT to a broker on a push-button signal: A Doorbell.
 
 # Hardware
 This project uses an ESP32 Devkit 1 board and an OV2640 breakout board. Also a push-button is used to "ring the bell". The button is wired up so it's low-active and connected to D33 on the ESP32. In the default configuration the camera needs to be wired up as shown below:
