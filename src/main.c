@@ -36,7 +36,7 @@
 #define PIN_WIFISTATUSLED 2
 #define PIN_PUSHBUTTON 33
 // MQTT Client-ID
-#define CLIENTID_MQTT "ESP32Doorbell01"
+#define CLIENTID_MQTT "ESP32Doorbell010"
 #define TOPIC_MQTT_PIC "hska/office010/doorbell/picture"
 #define TOPIC_MQTT_TS "hska/office010/doorbell/timestamp"
 // TAG for the esp_log macros
@@ -72,7 +72,6 @@ void mqtt_reconnect() {
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 // Reconnect MQTT with init (definition at init functions)
-void mqtt_init();
 /*****************************************
  * Task functions
  *****************************************/
@@ -125,11 +124,11 @@ void mqtt_publish_task(void* pvParameter) {
             send_buffer_time[3] = (uint8_t)(now >> 8) & 0xFF;
             send_buffer_time[4] = (uint8_t)now & 0xFF;
             // Send time stamp
-            esp_mqtt_publish(TOPIC_MQTT_TS, send_buffer_time, 5, 0, true);
+            esp_mqtt_publish(TOPIC_MQTT_TS, send_buffer_time, 5, 1, true);
             // Check RAM
-            ESP_LOGD(TAG, "%d B Heap remaining in OnBoard RAM", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
             // Send picture
-            esp_mqtt_publish(TOPIC_MQTT_PIC, fb->buf, fb->len, 0, true);
+            esp_mqtt_publish(TOPIC_MQTT_PIC, fb->buf, fb->len, 1, true);
             // Give back the buffer pointer
             esp_camera_fb_return(fb);
         }
@@ -145,18 +144,22 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
         case SYSTEM_EVENT_STA_START:
             // WiFi got initialized
             esp_wifi_connect();
+            ESP_LOGI(TAG, "Wifi connecting...");
             break;
         case SYSTEM_EVENT_STA_CONNECTED:
             // WiFi got connected; DHCP client started
             xEventGroupSetBits(wifi_event_group, CONNECTING_BIT);
+            ESP_LOGI(TAG, "Wifi connected...");
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             // WiFi got connected and DHCP retrieved an IP
             xEventGroupClearBits(wifi_event_group, CONNECTING_BIT);
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+            ESP_LOGI(TAG, "Wifi got IP.");
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             xEventGroupClearBits(wifi_event_group, CONNECTING_BIT | CONNECTED_BIT);
+            ESP_LOGI(TAG, "Wifi disconnected");
             // WiFi disconnected
             esp_mqtt_stop();
             // Try to reastablish a Wifi-connection
@@ -182,14 +185,15 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
     switch (status) {
         case ESP_MQTT_STATUS_CONNECTED:
             // Connected to MQTT-Broker
-            ESP_LOGI(TAG, "MQTT connected - starting/resuming publish task");
             // Task to publish data on button-down should be created and started if this is a fresh startup
             // and should be resumed if it has already been created
             if (!mqtt_publish_task_handle) {
+                ESP_LOGI(TAG, "MQTT connected - starting publish task");
                 if (xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 10, &mqtt_publish_task_handle) != pdPASS) {
                     ESP_LOGE(TAG, "mqtt_publish_task could not be created");
                 }
             } else {
+                ESP_LOGI(TAG, "MQTT connected - resuming publish task");
                 vTaskResume(mqtt_publish_task_handle);
             }
             break;
@@ -199,7 +203,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             // Task to publish data on button-down can be suspended as long as there is no connection to a broker
             vTaskSuspend(mqtt_publish_task_handle);
             // Try to reastablish a conenction to the MQTT-Broker
-            mqtt_init();
+            mqtt_reconnect();
             break;
     }
 }
@@ -284,7 +288,7 @@ void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 15000);
+    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 2000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
@@ -292,7 +296,6 @@ void mqtt_init() {
  *****************************************/
 void app_main() {
     // Set log levels
-    esp_log_level_set("wifi", ESP_LOG_WARN);
     esp_log_level_set("system_api", ESP_LOG_WARN);
     esp_log_level_set("gpio", ESP_LOG_WARN);
     esp_log_level_set(TAG, ESP_LOG_VERBOSE);
