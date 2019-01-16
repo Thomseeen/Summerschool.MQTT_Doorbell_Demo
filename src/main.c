@@ -202,6 +202,10 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             ESP_LOGI(TAG, "MQTT disconnected - suspending publish task");
             // Task to publish data on button-down can be suspended as long as there is no connection to a broker
             vTaskSuspend(mqtt_publish_task_handle);
+            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
+            // ESP_LOGI(TAG, "Let IDLE-Task free memory");
+            // vTaskDelay(5000 / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
             // Try to reastablish a conenction to the MQTT-Broker
             mqtt_reconnect();
             break;
@@ -317,4 +321,7 @@ void app_main() {
     cam_init();
     // MQTT init
     mqtt_init();
+
+    uint8_t data1 = 0, res = 0;
+    res |= (data1 << 8);
 }

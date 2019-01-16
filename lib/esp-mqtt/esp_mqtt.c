@@ -322,7 +322,7 @@ static void esp_mqtt_process(void* p) {
     if (esp_mqtt_status_callback) {
         esp_mqtt_status_callback(ESP_MQTT_STATUS_DISCONNECTED);
     }
-
+    ESP_LOGI(ESP_MQTT_LOG_TAG, "esp_mqtt_start: biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
     // delete task
     vTaskDelete(NULL);
 }
@@ -430,12 +430,18 @@ void esp_mqtt_start(const char* host, const char* port, const char* client_id, c
     }
 
     // create mqtt thread
-    ESP_LOGI(ESP_MQTT_LOG_TAG, "esp_mqtt_start: create task");
-    BaseType_t err = xTaskCreatePinnedToCore(esp_mqtt_process, "esp_mqtt", CONFIG_ESP_MQTT_TASK_STACK_SIZE, NULL, CONFIG_ESP_MQTT_TASK_STACK_PRIORITY, &esp_mqtt_task, 1);
-    if (err != pdPASS) {
-        ESP_LOGE(ESP_MQTT_LOG_TAG, "esp_mqtt_start: error while creating esp_mqtt_process task %d", err);
-        ESP_LOGI(ESP_MQTT_LOG_TAG, "esp_mqtt_start: biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    BaseType_t err = pdFAIL;
+    while (err != pdPASS) {
+        ESP_LOGI(ESP_MQTT_LOG_TAG, "esp_mqtt_start: biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
+        ESP_LOGI(ESP_MQTT_LOG_TAG, "esp_mqtt_start: create task");
+        err = xTaskCreatePinnedToCore(esp_mqtt_process, "esp_mqtt", CONFIG_ESP_MQTT_TASK_STACK_SIZE, NULL, CONFIG_ESP_MQTT_TASK_STACK_PRIORITY, &esp_mqtt_task, 1);
+        // BaseType_t err = xTaskCreate(esp_mqtt_process, "esp_mqtt", CONFIG_ESP_MQTT_TASK_STACK_SIZE, NULL, CONFIG_ESP_MQTT_TASK_STACK_PRIORITY, &esp_mqtt_task);
+        if (err != pdPASS) {
+            ESP_LOGE(ESP_MQTT_LOG_TAG, "esp_mqtt_start: error while creating esp_mqtt_process task %d", err);
+        }
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
+    ESP_LOGI(ESP_MQTT_LOG_TAG, "esp_mqtt_start: biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
     // set local flag
     esp_mqtt_running = true;
 

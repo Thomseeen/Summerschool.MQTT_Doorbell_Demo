@@ -9,6 +9,10 @@
 #define CONFIG_FREERTOS_USE_TRACE_FACILITY
 #define CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 /*
+ * - for xTaskCreatStatic
+ */
+#define CONFIG_SUPPORT_STATIC_ALLOCATION 1
+/*
  *
  * Automatically generated file; DO NOT EDIT.
  * Espressif IoT Development Framework Configuration
