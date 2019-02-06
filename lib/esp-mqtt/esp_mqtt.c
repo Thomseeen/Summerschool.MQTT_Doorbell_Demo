@@ -177,7 +177,7 @@ static bool esp_mqtt_process_connect() {
 
     // setup connect data
     lwmqtt_options_t options = lwmqtt_default_options;
-    options.keep_alive = 10;
+    options.keep_alive = 60;
     options.client_id = lwmqtt_string(esp_mqtt_config.client_id);
     options.username = lwmqtt_string(esp_mqtt_config.username);
     options.password = lwmqtt_string(esp_mqtt_config.password);

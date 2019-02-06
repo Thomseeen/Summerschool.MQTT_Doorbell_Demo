@@ -13,7 +13,7 @@
 #include "esp_err.h"
 #include "esp_event_loop.h"
 // Get lower level log messages
-// #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -36,13 +36,13 @@
 #define PIN_WIFISTATUSLED 2
 #define PIN_PUSHBUTTON 33
 // MQTT Client-ID
-#define CLIENTID_MQTT "ESP32Doorbell010"
-#define TOPIC_MQTT_PIC "hska/office010/doorbell/picture"
-#define TOPIC_MQTT_TS "hska/office010/doorbell/timestamp"
+#define CLIENTID_MQTT "ESP32Doorbell030"
+#define TOPIC_MQTT_PIC "hska/office030/doorbell/picture"
+#define TOPIC_MQTT_TS "hska/office030/doorbell/timestamp"
 // TAG for the esp_log macros
 #define TAG "MQTT_Doorbell"
 // Expected max. size of frame
-#define MAXSIZE_OF_FRAME 37000  // bytes
+#define MAXSIZE_OF_FRAME 25000  // bytes
 
 /*****************************************
  * Eventgroups
@@ -279,7 +279,7 @@ void cam_init() {
         .xclk_freq_hz = CONFIG_XCLK_FREQ,
         .pixel_format = PIXFORMAT_JPEG,
         .frame_size = FRAMESIZE_VGA,  // FRAMESIZE_QVGA,
-        .jpeg_quality = 20,
+        .jpeg_quality = 30,
         .fb_count = 1,
     };
     esp_err_t err = esp_camera_init(&camera_config);
@@ -292,17 +292,18 @@ void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 2000);
+    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 60000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
  * Main
  *****************************************/
 void app_main() {
+    nvs_flash_init();
     // Set log levels
-    esp_log_level_set("system_api", ESP_LOG_WARN);
-    esp_log_level_set("gpio", ESP_LOG_WARN);
-    esp_log_level_set(TAG, ESP_LOG_VERBOSE);
+    // esp_log_level_set("system_api", ESP_LOG_WARN);
+    // esp_log_level_set("gpio", ESP_LOG_WARN);
+    esp_log_level_set("phy_init", ESP_LOG_INFO);
     // Initialize nvs flash
     ESP_ERROR_CHECK(nvs_flash_init());
     // WiFi init and status LED task start
