@@ -13,7 +13,7 @@
 #include "esp_err.h"
 #include "esp_event_loop.h"
 // Get lower level log messages
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+// - #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -35,13 +35,18 @@
 // GPIO pins
 #define PIN_WIFISTATUSLED 2
 #define PIN_PUSHBUTTON 33
+
 // MQTT Client-ID
-#define CLIENTID_MQTT "ESP32Doorbell030"
-#define TOPIC_MQTT_PIC "hska/office030/doorbell/picture"
-#define TOPIC_MQTT_TS "hska/office030/doorbell/timestamp"
+#define ROOM "010"
+#define CLIENTID_MQTT "ESP32Doorbell" ROOM
+#define TOPIC_MQTT_PIC "hska/office" ROOM "/doorbell/picture"
+#define TOPIC_MQTT_TS "hska/office" ROOM "/doorbell/timestamp"
+
 // TAG for the esp_log macros
 #define TAG "MQTT_Doorbell"
-// Expected max. size of frame
+
+// Expected max. size of frame - used for the send-buffer to optimize heap usage
+// (camera often allocates a larger framebuffer than actually necessary)
 #define MAXSIZE_OF_FRAME 25000  // bytes
 
 /*****************************************
@@ -65,12 +70,14 @@ struct tm getLocalTime() {
     localtime_r(&now, &timeinfo);
     return timeinfo;
 }
+
 // Reconnect MQTT without init
 void mqtt_reconnect() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
+
 // Reconnect MQTT with init (definition at init functions)
 /*****************************************
  * Task functions
@@ -94,6 +101,7 @@ void statusled_task(void* pvParameter) {
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
+
 // Task to poll the pushbutton and publish a picture at button down
 void mqtt_publish_task(void* pvParameter) {
     gpio_pad_select_gpio(PIN_PUSHBUTTON);
@@ -135,6 +143,7 @@ void mqtt_publish_task(void* pvParameter) {
         vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
+
 /*****************************************
  * Event handler and callbacks
  *****************************************/
@@ -174,11 +183,13 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
     }
     return ESP_OK;
 }
+
 // MQTT
 // - incoming msg callback
 void mqtt_message_callback(const char* topic, uint8_t* payload, size_t len) {
     ESP_LOGI(TAG, "MQTT incoming msg: %s => %s (%d)", topic, payload, (int)len);
 }
+
 // - status callback
 void mqtt_status_callback(esp_mqtt_status_t status) {
     static TaskHandle_t mqtt_publish_task_handle = NULL;
@@ -211,6 +222,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             break;
     }
 }
+
 /*****************************************
  * Init / Start functions
  *****************************************/
@@ -234,6 +246,7 @@ void wifi_init() {
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
+
 // SNTP
 void sntp_start() {
     // Wait for a Wifi-connection
@@ -255,6 +268,7 @@ void sntp_start() {
         localtime_r(&now, &timeinfo);
     }
 }
+
 // Camera
 void cam_init() {
     ESP_LOGI(TAG, "Initializing camera");
@@ -288,6 +302,7 @@ void cam_init() {
         return;
     }
 }
+
 void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
@@ -299,11 +314,23 @@ void mqtt_init() {
  * Main
  *****************************************/
 void app_main() {
-    nvs_flash_init();
+    ESP_ERROR_CHECK(nvs_flash_init());
     // Set log levels
-    // esp_log_level_set("system_api", ESP_LOG_WARN);
-    // esp_log_level_set("gpio", ESP_LOG_WARN);
-    esp_log_level_set("phy_init", ESP_LOG_INFO);
+    /*
+     *esp_log_level_set("heap_init", ESP_LOG_INFO);
+     *esp_log_level_set("intr_alloc", ESP_LOG_INFO);
+     *esp_log_level_set("esp_dbg_stubs", ESP_LOG_INFO);
+     *esp_log_level_set("wifi", ESP_LOG_INFO);
+     *esp_log_level_set("nvs", ESP_LOG_INFO);
+     *esp_log_level_set("system_api", ESP_LOG_WARN);
+     *esp_log_level_set("gpio", ESP_LOG_WARN);
+     *esp_log_level_set("phy_init", ESP_LOG_INFO);
+     *esp_log_level_set("tcpip_adapter", ESP_LOG_INFO);
+     *esp_log_level_set("ledc", ESP_LOG_INFO);
+     *esp_log_level_set("camera", ESP_LOG_INFO);
+     *esp_log_level_set("esp_mqtt", ESP_LOG_INFO);
+     */
+
     // Initialize nvs flash
     ESP_ERROR_CHECK(nvs_flash_init());
     // WiFi init and status LED task start
@@ -322,7 +349,4 @@ void app_main() {
     cam_init();
     // MQTT init
     mqtt_init();
-
-    uint8_t data1 = 0, res = 0;
-    res |= (data1 << 8);
 }
