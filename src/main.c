@@ -56,6 +56,7 @@
 static EventGroupHandle_t connection_event_group;
 const static int CONNECTED_BIT_WIFI = BIT0;
 const static int CONNECTED_BIT_MQTT = BIT1;
+const static int RECONNECT_BIT_MQTT = BIT2;
 
 /*****************************************
  * Local helperfunctions
@@ -71,11 +72,13 @@ struct tm getLocalTime() {
     return timeinfo;
 }
 
-// Reconnect MQTT without init
+// Reconnect MQTT without init only if actually needed and not already triggered by mqtt_init
 void mqtt_reconnect() {
     // Wait for a Wifi-connection
-    xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
-    esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+    if (RECONNECT_BIT_MQTT & xEventGroupGetBits(connection_event_group)) {
+        esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+        xEventGroupClearBits(connection_event_group, RECONNECT_BIT_MQTT);
+    }
 }
 
 // Reconnect MQTT with init (definition at init functions)
@@ -134,7 +137,7 @@ void mqtt_publish_task(void* pvParameter) {
             // Send time stamp
             esp_mqtt_publish(TOPIC_MQTT_TS, send_buffer_time, 5, 1, true);
             // Check RAM
-            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
             // Send picture
             esp_mqtt_publish(TOPIC_MQTT_PIC, fb->buf, fb->len, 1, true);
             // Give back the buffer pointer
@@ -152,7 +155,7 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
     switch (event->event_id) {
         case SYSTEM_EVENT_STA_START:
             // WiFi got initialized
-            esp_wifi_connect();
+            ESP_ERROR_CHECK(esp_wifi_connect());
             ESP_LOGI(TAG, "Wifi connecting...");
             break;
         case SYSTEM_EVENT_STA_CONNECTED:
@@ -163,6 +166,7 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
             // WiFi got connected and DHCP retrieved an IP
             xEventGroupSetBits(connection_event_group, CONNECTED_BIT_WIFI);
             ESP_LOGI(TAG, "Wifi got IP.");
+            mqtt_reconnect();
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             xEventGroupClearBits(connection_event_group, CONNECTED_BIT_MQTT | CONNECTED_BIT_WIFI);
@@ -170,9 +174,11 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
             // WiFi disconnected
             esp_mqtt_stop();
             // Try to reastablish a Wifi-connection
-            esp_wifi_connect();
-            // Try to reastablish connection to mqtt-broker
-            mqtt_reconnect();
+            if (!(CONNECTED_BIT_WIFI & xEventGroupGetBits(connection_event_group))) {
+                ESP_ERROR_CHECK(esp_wifi_connect());
+                ESP_LOGI(TAG, "Wifi trying to reconnect");
+            }
+            xEventGroupSetBits(connection_event_group, RECONNECT_BIT_MQTT);
             break;
         default:
             ESP_LOGW(TAG, "unknown WiFi-state");
@@ -208,10 +214,12 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             // Task to publish data on button-down can be suspended as long as there is no connection to a broker
             vTaskSuspend(mqtt_publish_task_handle);
             ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
+            // When working at the limit of the RAM-size there might be the need to wait for the IDLE-task to free memory
             // ESP_LOGI(TAG, "Let IDLE-Task free memory");
             // vTaskDelay(5000 / portTICK_PERIOD_MS);
             // ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
-            // Try to reastablish a conenction to the MQTT-Broker
+            // Try to reastablish a connection to the MQTT-Broker
+            xEventGroupSetBits(connection_event_group, RECONNECT_BIT_MQTT);
             mqtt_reconnect();
             break;
     }
@@ -301,7 +309,7 @@ void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, NULL, MAXSIZE_OF_FRAME, 15000);
+    esp_mqtt_init(mqtt_status_callback, NULL, MAXSIZE_OF_FRAME, 30000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
