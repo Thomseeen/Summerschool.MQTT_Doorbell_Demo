@@ -37,7 +37,7 @@
 #define PIN_PUSHBUTTON 33
 
 // MQTT Client-ID
-#define ROOM "040"
+#define ROOM "010"
 #define CLIENTID_MQTT "ESP32Doorbell" ROOM
 #define TOPIC_MQTT_PIC "hska/office" ROOM "/doorbell/picture"
 #define TOPIC_MQTT_TS "hska/office" ROOM "/doorbell/timestamp"
@@ -307,7 +307,7 @@ void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 5000);
+    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 15000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
