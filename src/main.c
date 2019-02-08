@@ -126,7 +126,7 @@ void mqtt_publish_task(void* pvParameter) {
             // Build timestamp buffer
             uint8_t send_buffer_time[5];
             // The time_t datatype is a long -> 4 bytes that have to be sent
-            send_buffer_time[0] = 'T';  // (Local) Used to easily identify the time message part in a hex-dump
+            send_buffer_time[0] = 'T';  // (Time) Used to easily identify the time message part in a hex-dump
             send_buffer_time[1] = (uint8_t)(now >> 24) & 0xFF;
             send_buffer_time[2] = (uint8_t)(now >> 16) & 0xFF;
             send_buffer_time[3] = (uint8_t)(now >> 8) & 0xFF;
@@ -182,12 +182,6 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
     return ESP_OK;
 }
 
-// MQTT
-// - incoming msg callback
-void mqtt_message_callback(const char* topic, uint8_t* payload, size_t len) {
-    ESP_LOGI(TAG, "MQTT incoming msg: %s => %s (%d)", topic, payload, (int)len);
-}
-
 // - status callback
 void mqtt_status_callback(esp_mqtt_status_t status) {
     static TaskHandle_t mqtt_publish_task_handle = NULL;
@@ -216,7 +210,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
             // ESP_LOGI(TAG, "Let IDLE-Task free memory");
             // vTaskDelay(5000 / portTICK_PERIOD_MS);
-            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
+            // ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
             // Try to reastablish a conenction to the MQTT-Broker
             mqtt_reconnect();
             break;
@@ -307,14 +301,13 @@ void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 15000);
+    esp_mqtt_init(mqtt_status_callback, NULL, MAXSIZE_OF_FRAME, 15000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
  * Main
  *****************************************/
 void app_main() {
-    ESP_ERROR_CHECK(nvs_flash_init());
     // Set log levels
     /*
      *esp_log_level_set("heap_init", ESP_LOG_INFO);
