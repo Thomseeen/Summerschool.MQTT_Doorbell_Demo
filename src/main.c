@@ -33,11 +33,11 @@
  * Local defines/settings
  *****************************************/
 // GPIO pins
-#define PIN_WIFISTATUSLED 2
+#define PIN_STATUSLED 2
 #define PIN_PUSHBUTTON 33
 
 // MQTT Client-ID
-#define ROOM "010"
+#define ROOM "040"
 #define CLIENTID_MQTT "ESP32Doorbell" ROOM
 #define TOPIC_MQTT_PIC "hska/office" ROOM "/doorbell/picture"
 #define TOPIC_MQTT_TS "hska/office" ROOM "/doorbell/timestamp"
@@ -52,10 +52,10 @@
 /*****************************************
  * Eventgroups
  *****************************************/
-// Wifi
-static EventGroupHandle_t wifi_event_group;
-const static int CONNECTED_BIT = BIT0;
-const static int CONNECTING_BIT = BIT1;
+// Connection
+static EventGroupHandle_t connection_event_group;
+const static int CONNECTED_BIT_WIFI = BIT0;
+const static int CONNECTED_BIT_MQTT = BIT1;
 
 /*****************************************
  * Local helperfunctions
@@ -74,7 +74,7 @@ struct tm getLocalTime() {
 // Reconnect MQTT without init
 void mqtt_reconnect() {
     // Wait for a Wifi-connection
-    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
+    xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 
@@ -82,20 +82,20 @@ void mqtt_reconnect() {
 /*****************************************
  * Task functions
  *****************************************/
-// Task to blink, turn on or turn off the wifi status LED
+// Task to blink, turn on or turn off the status LED
 void statusled_task(void* pvParameter) {
     // Setup the GPIO pin
-    gpio_pad_select_gpio(PIN_WIFISTATUSLED);
-    gpio_set_direction(PIN_WIFISTATUSLED, GPIO_MODE_INPUT_OUTPUT);
+    gpio_pad_select_gpio(PIN_STATUSLED);
+    gpio_set_direction(PIN_STATUSLED, GPIO_MODE_INPUT_OUTPUT);
     // Tasks "main"-loop
     while (1) {
-        // Use wifi's eventgroup to blink, turn on or turn off the wifi status LED
-        if (CONNECTED_BIT & xEventGroupGetBits(wifi_event_group)) {
-            gpio_set_level(PIN_WIFISTATUSLED, 1);
-        } else if (CONNECTING_BIT & xEventGroupGetBits(wifi_event_group)) {
-            gpio_set_level(PIN_WIFISTATUSLED, !gpio_get_level(PIN_WIFISTATUSLED));
+        // Use eventgroup to blink, turn on or turn off the status LED based on WiFi and MQTT connection
+        if (CONNECTED_BIT_MQTT & xEventGroupGetBits(connection_event_group)) {
+            gpio_set_level(PIN_STATUSLED, 1);
+        } else if (CONNECTED_BIT_WIFI & xEventGroupGetBits(connection_event_group)) {
+            gpio_set_level(PIN_STATUSLED, !gpio_get_level(PIN_STATUSLED));
         } else {
-            gpio_set_level(PIN_WIFISTATUSLED, 0);
+            gpio_set_level(PIN_STATUSLED, 0);
         }
         // Task gets called every 200ms => reaction time < 200ms and blink frequenzy is 5Hz
         vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -157,17 +157,15 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
             break;
         case SYSTEM_EVENT_STA_CONNECTED:
             // WiFi got connected; DHCP client started
-            xEventGroupSetBits(wifi_event_group, CONNECTING_BIT);
             ESP_LOGI(TAG, "Wifi connected...");
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             // WiFi got connected and DHCP retrieved an IP
-            xEventGroupClearBits(wifi_event_group, CONNECTING_BIT);
-            xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+            xEventGroupSetBits(connection_event_group, CONNECTED_BIT_WIFI);
             ESP_LOGI(TAG, "Wifi got IP.");
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
-            xEventGroupClearBits(wifi_event_group, CONNECTING_BIT | CONNECTED_BIT);
+            xEventGroupClearBits(connection_event_group, CONNECTED_BIT_MQTT | CONNECTED_BIT_WIFI);
             ESP_LOGI(TAG, "Wifi disconnected");
             // WiFi disconnected
             esp_mqtt_stop();
@@ -178,7 +176,7 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
             break;
         default:
             ESP_LOGW(TAG, "unknown WiFi-state");
-            xEventGroupClearBits(wifi_event_group, CONNECTING_BIT | CONNECTED_BIT);
+            xEventGroupClearBits(connection_event_group, CONNECTED_BIT_MQTT | CONNECTED_BIT_WIFI);
             break;
     }
     return ESP_OK;
@@ -198,6 +196,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             // Connected to MQTT-Broker
             // Task to publish data on button-down should be created and started if this is a fresh startup
             // and should be resumed if it has already been created
+            xEventGroupSetBits(connection_event_group, CONNECTED_BIT_MQTT);
             if (!mqtt_publish_task_handle) {
                 ESP_LOGI(TAG, "MQTT connected - starting publish task");
                 if (xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 10, &mqtt_publish_task_handle) != pdPASS) {
@@ -209,6 +208,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             }
             break;
         case ESP_MQTT_STATUS_DISCONNECTED:
+            xEventGroupClearBits(connection_event_group, CONNECTED_BIT_MQTT);
             // Disconnected from MQTT-Broker
             ESP_LOGI(TAG, "MQTT disconnected - suspending publish task");
             // Task to publish data on button-down can be suspended as long as there is no connection to a broker
@@ -230,7 +230,7 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
 void wifi_init() {
     ESP_LOGI(TAG, "Initializing Wifi");
     tcpip_adapter_init();
-    wifi_event_group = xEventGroupCreate();
+    connection_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_loop_init(wifi_event_handler, NULL));
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -250,7 +250,7 @@ void wifi_init() {
 // SNTP
 void sntp_start() {
     // Wait for a Wifi-connection
-    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
+    xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, CONFIG_SERVER_NTP);
@@ -305,9 +305,9 @@ void cam_init() {
 
 void mqtt_init() {
     // Wait for a Wifi-connection
-    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
+    xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
     ESP_LOGI(TAG, "Initializing MQTT");
-    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 60000);
+    esp_mqtt_init(mqtt_status_callback, mqtt_message_callback, MAXSIZE_OF_FRAME, 5000);
     esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
 }
 /*****************************************
