@@ -24,3 +24,6 @@ This project uses an ESP32 Devkit 1 board and an OV2640 breakout board. Also a p
 | Camera Power Down| PWDN| 100k Pulldown to Gnd| 
 | Power Supply 3.3V| 3V3| 3V3| 
 | Ground| GND| GND| 
+
+# Client
+To display if someone ringed the door and show the image taken, take a look at https://github.com/Thomseeen/Summerschool.MQTT_Doorbell_Client.
