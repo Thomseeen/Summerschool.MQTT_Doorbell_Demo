@@ -1,4 +1,5 @@
+# Library Versions
 Libs have been downloaded in the listed versions and edited to work in the PlatformIO-environment:
-esp32_camera #f8f26ab
-esp-mqtt #89bc453
-LWMQTT 0.6.2 #2416b52
+* esp32_camera #f8f26ab
+* esp-mqtt #89bc453
+* LWMQTT 0.6.2 #2416b52

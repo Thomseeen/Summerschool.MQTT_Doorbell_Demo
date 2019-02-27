@@ -47,7 +47,7 @@
 
 // Expected max. size of frame - used for the send-buffer to optimize heap usage
 // (camera often allocates a larger framebuffer than actually necessary)
-#define MAXSIZE_OF_FRAME 25000  // bytes
+#define MAXSIZE_OF_FRAME 27000  // bytes
 
 /*****************************************
  * Eventgroups
@@ -150,7 +150,7 @@ void mqtt_publish_task(void* pvParameter) {
 /*****************************************
  * Event handler and callbacks
  *****************************************/
-// Wifi
+// Wifi event handler
 static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
     switch (event->event_id) {
         case SYSTEM_EVENT_STA_START:
@@ -188,7 +188,7 @@ static esp_err_t wifi_event_handler(void* ctx, system_event_t* event) {
     return ESP_OK;
 }
 
-// - status callback
+// MQTT status callback
 void mqtt_status_callback(esp_mqtt_status_t status) {
     static TaskHandle_t mqtt_publish_task_handle = NULL;
     switch (status) {
@@ -305,6 +305,7 @@ void cam_init() {
     }
 }
 
+// MQTT
 void mqtt_init() {
     // Wait for a Wifi-connection
     xEventGroupWaitBits(connection_event_group, CONNECTED_BIT_WIFI, false, true, portMAX_DELAY);
