@@ -32,15 +32,16 @@
 /*****************************************
  * Local defines/settings
  *****************************************/
+// clang-format off
 // GPIO pins
-#define PIN_STATUSLED 2
-#define PIN_PUSHBUTTON 33
+#define PIN_STATUSLED   2
+#define PIN_PUSHBUTTON  33
 
 // MQTT Client-ID
 #define ROOM "010"
-#define CLIENTID_MQTT "ESP32Doorbell" ROOM
-#define TOPIC_MQTT_PIC "hska/office" ROOM "/doorbell/picture"
-#define TOPIC_MQTT_TS "hska/office" ROOM "/doorbell/timestamp"
+#define CLIENTID_MQTT   "ESP32Doorbell" ROOM
+#define TOPIC_MQTT_PIC  "hska/office"   ROOM "/doorbell/picture"
+#define TOPIC_MQTT_TS   "hska/office"   ROOM "/doorbell/timestamp"
 
 // TAG for the esp_log macros
 #define TAG "MQTT_Doorbell"
@@ -49,6 +50,7 @@
 // (camera often allocates a larger framebuffer than actually necessary)
 #define MAXSIZE_OF_FRAME 27000  // bytes
 
+// clang-format on
 /*****************************************
  * Eventgroups
  *****************************************/
@@ -243,8 +245,10 @@ void wifi_init() {
     wifi_config_t wifi_config = {
         .sta =
             {
-                .ssid = CONFIG_WIFI_SSID,
-                .password = CONFIG_WIFI_PASSWORD,
+                // clang-format off
+                .ssid       = CONFIG_WIFI_SSID,
+                .password   = CONFIG_WIFI_PASSWORD,
+                // clang-format on
             },
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -278,28 +282,30 @@ void sntp_start() {
 void cam_init() {
     ESP_LOGI(TAG, "Initializing camera");
     camera_config_t camera_config = {
-        .ledc_channel = LEDC_CHANNEL_0,
-        .ledc_timer = LEDC_TIMER_0,
-        .pin_d0 = CONFIG_D0,
-        .pin_d1 = CONFIG_D1,
-        .pin_d2 = CONFIG_D2,
-        .pin_d3 = CONFIG_D3,
-        .pin_d4 = CONFIG_D4,
-        .pin_d5 = CONFIG_D5,
-        .pin_d6 = CONFIG_D6,
-        .pin_d7 = CONFIG_D7,
-        .pin_xclk = CONFIG_XCLK,
-        .pin_pclk = CONFIG_PCLK,
-        .pin_vsync = CONFIG_VSYNC,
-        .pin_href = CONFIG_HREF,
-        .pin_sscb_sda = CONFIG_SDA,
-        .pin_sscb_scl = CONFIG_SCL,
-        .pin_reset = CONFIG_RESET,
-        .xclk_freq_hz = CONFIG_XCLK_FREQ,
-        .pixel_format = PIXFORMAT_JPEG,
-        .frame_size = FRAMESIZE_VGA,  // FRAMESIZE_QVGA,
-        .jpeg_quality = 30,
-        .fb_count = 1,
+        // clang-format off
+        .ledc_channel   = LEDC_CHANNEL_0,
+        .ledc_timer     = LEDC_TIMER_0,
+        .pin_d0         = CONFIG_D0,
+        .pin_d1         = CONFIG_D1,
+        .pin_d2         = CONFIG_D2,
+        .pin_d3         = CONFIG_D3,
+        .pin_d4         = CONFIG_D4,
+        .pin_d5         = CONFIG_D5,
+        .pin_d6         = CONFIG_D6,
+        .pin_d7         = CONFIG_D7,
+        .pin_xclk       = CONFIG_XCLK,
+        .pin_pclk       = CONFIG_PCLK,
+        .pin_vsync      = CONFIG_VSYNC,
+        .pin_href       = CONFIG_HREF,
+        .pin_sscb_sda   = CONFIG_SDA,
+        .pin_sscb_scl   = CONFIG_SCL,
+        .pin_reset      = CONFIG_RESET,
+        .xclk_freq_hz   = CONFIG_XCLK_FREQ,
+        .pixel_format   = PIXFORMAT_JPEG,
+        .frame_size     = FRAMESIZE_VGA,
+        .jpeg_quality   = 30,
+        .fb_count       = 1,
+        // clang-format on
     };
     esp_err_t err = esp_camera_init(&camera_config);
     if (err != ESP_OK) {
