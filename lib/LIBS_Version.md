@@ -1,14 +1,14 @@
 # Library Versions
 Libs have been downloaded in the listed versions and edited to work in the PlatformIO-environment:
-* esp32_camera @f8f26ab
+* esp32_camera @113629b
 
-  https://github.com/espressif/esp32-camera/tree/f8f26ab04492c28be5922ac06994a78440ad8258
+  https://github.com/espressif/esp32-camera/tree/113629b1cf8769f65c09db0c3577a597e652860b
   
-* esp-mqtt @89bc453
+* esp-mqtt v0.7.0  @d63cef8
 
-  https://github.com/256dpi/esp-mqtt/tree/89bc453631124a10356f02a434b4270990d457f1
+  https://github.com/256dpi/esp-mqtt/tree/d63cef8bc9c99bb179feb315dbce8b5646320b82
   
-* LWMQTT 0.6.2 @2416b52
+* LWMQTT v0.6.4 @d9dbe5e
 
-  https://github.com/256dpi/lwmqtt/tree/2416b5296e71030bc8e84ee5ea88e06a6cb622a5
+  https://github.com/256dpi/lwmqtt/tree/d9dbe5e37a735b0ed29d41308140b7a0c448708e
   

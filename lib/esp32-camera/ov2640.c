@@ -241,6 +241,15 @@ static int set_framesize(sensor_t *sensor, framesize_t framesize)
 
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_BYPAS);
     WRITE_REGS_OR_RETURN(regs);
+    if (sensor->pixformat == PIXFORMAT_JPEG && sensor->xclk_freq_hz == 10000000) {
+        if (framesize <= FRAMESIZE_CIF) {
+            WRITE_REG_OR_RETURN(BANK_SENSOR, CLKRC, CLKRC_2X_CIF);
+        } else if (framesize <= FRAMESIZE_SVGA) {
+            WRITE_REG_OR_RETURN(BANK_SENSOR, CLKRC, CLKRC_2X_SVGA);
+        } else {
+            WRITE_REG_OR_RETURN(BANK_SENSOR, CLKRC, CLKRC_2X_UXGA);
+        }
+    }
     WRITE_REG_OR_RETURN(BANK_DSP, ZMOW, (w>>2)&0xFF); // OUTW[7:0] (real/4)
     WRITE_REG_OR_RETURN(BANK_DSP, ZMOH, (h>>2)&0xFF); // OUTH[7:0] (real/4)
     WRITE_REG_OR_RETURN(BANK_DSP, ZMHH, ((h>>8)&0x04)|((w>>10)&0x03)); // OUTH[8]/OUTW[9:8]
@@ -414,8 +423,10 @@ static int set_hmirror_sensor(sensor_t *sensor, int enable)
 
 static int set_vflip_sensor(sensor_t *sensor, int enable)
 {
+    int ret = 0;
     sensor->status.vflip = enable;
-    return write_reg_bits(sensor, BANK_SENSOR, REG04, REG04_VFLIP_IMG, enable?1:0);
+    ret = write_reg_bits(sensor, BANK_SENSOR, REG04, REG04_VREF_EN, enable?1:0);
+    return ret & write_reg_bits(sensor, BANK_SENSOR, REG04, REG04_VFLIP_IMG, enable?1:0);
 }
 
 static int set_raw_gma_dsp(sensor_t *sensor, int enable)

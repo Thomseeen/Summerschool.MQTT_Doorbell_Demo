@@ -213,16 +213,12 @@ static esp_err_t camera_fb_init(size_t count) {
         }
         memset(_fb2, 0, sizeof(camera_fb_int_t));
         _fb2->size = s_state->fb_size;
-        if (s_state->config.pixel_format == PIXFORMAT_JPEG) {
-            _fb2->buf = (uint8_t*)calloc(_fb2->size, 1);
-        }
+        _fb2->buf = (uint8_t*)calloc(_fb2->size, 1);
         if (!_fb2->buf) {
             ESP_LOGI(TAG, "Allocating %d KB frame buffer in PSRAM", s_state->fb_size / 1024);
             _fb2->buf = (uint8_t*)heap_caps_calloc(_fb2->size, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         } else {
             ESP_LOGI(TAG, "Allocating %d KB frame buffer in OnBoard RAM", s_state->fb_size / 1024);
-            ESP_LOGI(TAG, "%d B Heap remaining in OnBoard RAM", heap_caps_get_free_size(MALLOC_CAP_8BIT));
-            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
         }
         if (!_fb2->buf) {
             free(_fb2);
@@ -840,6 +836,7 @@ esp_err_t camera_probe(const camera_config_t* config, camera_model_t* out_camera
         return ESP_ERR_CAMERA_NOT_DETECTED;
     }
     s_state->sensor.slv_addr = slv_addr;
+    s_state->sensor.xclk_freq_hz = config->xclk_freq_hz;
 
     // s_state->sensor.slv_addr = 0x30;
     ESP_LOGD(TAG, "Detected camera at address=0x%02x", s_state->sensor.slv_addr);
