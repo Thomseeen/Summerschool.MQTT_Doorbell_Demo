@@ -127,23 +127,26 @@ void mqtt_publish_task(void* pvParameter) {
             }
             ESP_LOGI(TAG, "Doorbell ringing at %s, picture with %dbytes sent", timestr_buffer, fb->len);
             // Build timestamp buffer
-            uint8_t send_buffer_time[5];
+            uint8_t send_buffer_time[4];
             // The time_t datatype is a long -> 4 bytes that have to be sent
-            send_buffer_time[0] = 'T';  // (Time) Used to easily identify the time message part in a hex-dump
-            send_buffer_time[1] = (uint8_t)(now >> 24) & 0xFF;
-            send_buffer_time[2] = (uint8_t)(now >> 16) & 0xFF;
-            send_buffer_time[3] = (uint8_t)(now >> 8) & 0xFF;
-            send_buffer_time[4] = (uint8_t)now & 0xFF;
+            send_buffer_time[0] = (uint8_t)(now >> 24) & 0xFF;
+            send_buffer_time[1] = (uint8_t)(now >> 16) & 0xFF;
+            send_buffer_time[2] = (uint8_t)(now >> 8) & 0xFF;
+            send_buffer_time[3] = (uint8_t)now & 0xFF;
             // Send time stamp
-            esp_mqtt_publish(TOPIC_MQTT_TS, send_buffer_time, 5, 1, true);
+            esp_mqtt_publish(TOPIC_MQTT_TS, send_buffer_time, 4, 1, true);
             // Check RAM
             ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
             // Send picture
             esp_mqtt_publish(TOPIC_MQTT_PIC, fb->buf, fb->len, 1, true);
             // Give back the buffer pointer
             esp_camera_fb_return(fb);
+            // Debounce
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        } else {
+            // Polling the button every 100ms
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
-        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 
