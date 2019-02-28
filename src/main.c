@@ -78,7 +78,13 @@ struct tm getLocalTime() {
 void mqtt_reconnect() {
     // Wait for a Wifi-connection
     if (RECONNECT_BIT_MQTT & xEventGroupGetBits(connection_event_group)) {
-        esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+        ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
+        bool success = false;
+        // Retry if there is not enough heap memory to start the mqtt background task
+        while (!success) {
+            esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        }
         xEventGroupClearBits(connection_event_group, RECONNECT_BIT_MQTT);
     }
 }
@@ -218,7 +224,6 @@ void mqtt_status_callback(esp_mqtt_status_t status) {
             ESP_LOGI(TAG, "MQTT disconnected - suspending publish task");
             // Task to publish data on button-down can be suspended as long as there is no connection to a broker
             vTaskSuspend(mqtt_publish_task_handle);
-            ESP_LOGI(TAG, "Biggest free heap-block is %d bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));  // heapcontrol
             // When working at the limit of the RAM-size there might be the need to wait for the IDLE-task to free memory
             // ESP_LOGI(TAG, "Let IDLE-Task free memory");
             // vTaskDelay(5000 / portTICK_PERIOD_MS);
