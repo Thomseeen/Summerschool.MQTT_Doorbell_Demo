@@ -82,7 +82,7 @@ void mqtt_reconnect() {
         bool success = false;
         // Retry if there is not enough heap memory to start the mqtt background task
         while (!success) {
-            esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
+            success = esp_mqtt_start(CONFIG_MQTT_BROKER_IP, CONFIG_MQTT_PORT, CLIENTID_MQTT, CONFIG_MQTT_USER, CONFIG_MQTT_PASS);
             vTaskDelay(500 / portTICK_PERIOD_MS);
         }
         xEventGroupClearBits(connection_event_group, RECONNECT_BIT_MQTT);
