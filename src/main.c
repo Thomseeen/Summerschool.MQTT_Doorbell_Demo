@@ -19,8 +19,7 @@
 #include "esp_wifi.h"
 #include "nvs_flash.h"
 // SNTP
-#include "apps/sntp/sntp.h"
-#include "lwip/err.h"
+#include "lwip/apps/sntp.h"
 // Camera
 #include "esp_camera.h"
 // MQTT
@@ -308,7 +307,7 @@ void cam_init() {
         .xclk_freq_hz   = CONFIG_XCLK_FREQ,
         .pixel_format   = PIXFORMAT_JPEG,
         .frame_size     = FRAMESIZE_VGA,
-        .jpeg_quality   = 30,
+        .jpeg_quality   = 50,
         .fb_count       = 1,
         // clang-format on
     };
